@@ -15,7 +15,7 @@ namespace HotkeyDraw
     {
         private bool isDrawing = false;
 
-        private Pen blackPen = new Pen(new SolidBrush(Color.Black), 4);
+        private Pen drawPen = new Pen(new SolidBrush(Color.Black), 4);
 
         private Point selectionPoint;
 
@@ -23,9 +23,13 @@ namespace HotkeyDraw
 
         private List<Rectangle> drawRectangleList = new List<Rectangle>();
 
+        private List<Pen> drawRectanglePenList = new List<Pen>();
+
         private Point[] drawLinePointArray = new Point[2];
 
         private List<Point[]> drawLinePointArrayList = new List<Point[]>();
+
+        private List<Pen> drawLinePointArrayPenList = new List<Pen>();
 
         private const int MOD_CONTROL = 0x0002;
 
@@ -40,6 +44,12 @@ namespace HotkeyDraw
         private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
         private int shapeIndex = 0;
+
+        private int timesOne = 0;
+
+        private int timesTwo = 0;
+
+        private bool doneDrawing = false;
 
         public MainForm()
         {
@@ -74,19 +84,37 @@ namespace HotkeyDraw
         {
             if (m.Msg == WM_HOTKEY)
             {
+                if (this.doneDrawing)
+                {
+                    this.timesOne = 0;
+                    this.timesTwo = 0;
+                    this.doneDrawing = false;
+                }
+
                 switch (m.WParam.ToInt32())
                 {
                     case 1:
+
+                        this.timesTwo = 0;
+
+                        this.timesOne++;
+
+                        if (this.timesOne > 3)
+                        { this.timesOne = 1; }
+
+                        this.SetDrawing(m.WParam.ToInt32(), Math.Max(this.timesOne, this.timesTwo));
+
+                        break;
                     case 2:
-                        this.SetCanvasPictureBoxImage();
 
-                        this.shapeIndex = m.WParam.ToInt32();
+                        this.timesOne = 0;
 
-                        this.selectionPoint = new Point();
+                        this.timesTwo++;
 
-                        this.isDrawing = true;
+                        if (this.timesOne > 3)
+                        { this.timesTwo = 1; }
 
-                        this.canvasPictureBox.Cursor = Cursors.Cross;
+                        this.SetDrawing(m.WParam.ToInt32(), Math.Max(this.timesOne, this.timesTwo));
 
                         break;
 
@@ -109,6 +137,37 @@ namespace HotkeyDraw
             {
                 base.WndProc(ref m);
             }
+        }
+
+        private void SetDrawing(int messageShapeIndex, int colorIndex)
+        {
+            this.SetCanvasPictureBoxImage();
+
+            this.shapeIndex = messageShapeIndex;
+
+            this.selectionPoint = new Point();
+
+            this.isDrawing = true;
+
+            switch (colorIndex)
+            {
+                case 1:
+                    this.drawPen = new Pen(new SolidBrush(Color.Black), 4);
+
+                    break;
+
+                case 2:
+                    this.drawPen = new Pen(new SolidBrush(Color.White), 4);
+
+                    break;
+
+                default:
+                    this.drawPen = new Pen(new SolidBrush(Color.Red), 4);
+
+                    break;
+            }
+
+            this.canvasPictureBox.Cursor = Cursors.Cross;
         }
 
         private void CanvasPictureBoxMouseDown(object sender, MouseEventArgs e)
@@ -136,6 +195,8 @@ namespace HotkeyDraw
             {
                 this.drawRectangleList.Add(this.drawRectangle);
 
+                this.drawRectanglePenList.Add(this.drawPen);
+
                 this.drawRectangle = new Rectangle();
             }
 
@@ -143,8 +204,12 @@ namespace HotkeyDraw
             {
                 this.drawLinePointArrayList.Add(this.drawLinePointArray);
 
+                this.drawLinePointArrayPenList.Add(this.drawPen);
+
                 this.drawLinePointArray = new Point[2];
             }
+
+            this.doneDrawing = true;
 
             this.canvasPictureBox.Cursor = DefaultCursor;
         }
@@ -190,27 +255,25 @@ namespace HotkeyDraw
                 switch (this.shapeIndex)
                 {
                     case 1:
-                        e.Graphics.DrawRectangle(this.blackPen, this.drawRectangle);
+                        e.Graphics.DrawRectangle(this.drawPen, this.drawRectangle);
 
                         break;
 
                     case 2:
-                        e.Graphics.DrawLine(this.blackPen, this.drawLinePointArray[0], this.drawLinePointArray[1]);
+                        e.Graphics.DrawLine(this.drawPen, this.drawLinePointArray[0], this.drawLinePointArray[1]);
 
                         break;
                 }
             }
-            else
-            {
-                foreach (var currentDrawRectangle in this.drawRectangleList)
-                {
-                    e.Graphics.DrawRectangle(this.blackPen, currentDrawRectangle);
-                }
 
-                foreach (var currentDrawLinePointArray in this.drawLinePointArrayList)
-                {
-                    e.Graphics.DrawLine(this.blackPen, currentDrawLinePointArray[0], currentDrawLinePointArray[1]);
-                }
+            for (int i = 0; i < this.drawRectangleList.Count; i++)
+            {
+                e.Graphics.DrawRectangle(this.drawRectanglePenList[i], this.drawRectangleList[i]);
+            }
+
+            for (int i = 0; i < this.drawLinePointArrayList.Count; i++)
+            {
+                e.Graphics.DrawLine(this.drawLinePointArrayPenList[i], this.drawLinePointArrayList[i][0], this.drawLinePointArrayList[i][1]);
             }
 
             e.Graphics.Save();
